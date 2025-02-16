@@ -1,0 +1,16 @@
+asposestorage==1.0.2
+engine==0.6.0
+htmlmin==0.1.12
+huggingface_hub==0.25.0
+ipython==8.31.0
+llava==0.0.1.dev0
+minigpt4==0.0.1.dev0
+pandas==2.0.3
+pillow==10.3.0
+prompts==0.0.1
+requests==2.32.3
+sat==0.7.0
+torch==2.0.1
+tqdm==4.67.1
+transformers==4.48.1
+utils==1.0.2
