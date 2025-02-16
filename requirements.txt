@@ -4,8 +4,7 @@ huggingface_hub==0.27.1
 ipython
 llava==0.0.1.dev0
 minigpt4==0.0.1.dev0
-pandas==2.0.3
-pandas==1.5.3
+pandas
 Pillow
 prompts==0.0.1
 Requests==2.32.3
