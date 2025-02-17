@@ -1,3 +1,79 @@
+from llava.model.builder import load_pretrained_model
+from llava.mm_utils import get_model_name_from_path
+from llava.eval.run_llava import eval_model2
+import argparse
+import os
+import csv
+
+import argparse
+import torch
+
+from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
+from llava.conversation import conv_templates, SeparatorStyle
+from llava.model.builder import load_pretrained_model
+from llava.utils import disable_torch_init
+from llava.mm_utils import process_images, tokenizer_image_token, get_model_name_from_path, KeywordsStoppingCriteria
+
+from PIL import Image
+
+import requests
+from PIL import Image
+from io import BytesIO
+from transformers import TextStreamer
+
+import pandas as pd
+
+from PIL import Image
+
+import sys
+
+import torch
+import transformers
+from tqdm.contrib import tzip
+import pathlib
+from functools import partial
+import warnings
+import traceback
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Demo")
+    parser.add_argument("--query", type=str, required=True)
+    parser.add_argument("--type", type=str, required=True)
+    parser.add_argument("--model-path", type=str, default="liuhaotian/llava-v1.5-13b")
+    parser.add_argument("--model-base", type=str, default=None)
+    # parser.add_argument("--image-file", type=str, required=True)
+    parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--conv-mode", type=str, default=None)
+    parser.add_argument("--temperature", type=float, default=0.2)
+    parser.add_argument("--max-new-tokens", type=int, default=512)
+    parser.add_argument("--load-8bit", action="store_true")
+    parser.add_argument("--load-4bit", action="store_true")
+    parser.add_argument("--debug", action="store_true")
+    args = parser.parse_args()
+    return args
+
+def load_image(image_file):
+    if image_file.startswith('http://') or image_file.startswith('https://'):
+        response = requests.get(image_file)
+        image = Image.open(BytesIO(response.content)).convert('RGB')
+    else:
+        image = Image.open(image_file).convert('RGB')
+    return image
+
+def load_query_file(query_file):
+    df = pd.read_csv(query_file)
+    img_paths = df['img_path'].tolist()
+    queries = df['query'].tolist()
+    new_queries = df['new query'].tolist()
+    answers = df['answer'].tolist()
+    new_answers = df['new answer'].tolist()
+    typies = df['type'].tolist()
+    assert len(img_paths) == len(queries) == len(new_queries)
+    return img_paths, queries, new_queries,answers,new_answers,typies
+
+def make_prompt(prompt):
+    return prompt + " Answer the question using a single word or phrase."
 def main(args):
 
     img_paths, queries, new_queries, answers, new_answers, typies = load_query_file(args.query)
@@ -121,3 +197,9 @@ def main(args):
     # ===== Changed: Write all results at once using pandas =====
     df = pd.DataFrame(results)
     df.to_csv(f"{args.type}_responses.csv", index=False, encoding='utf-8')
+
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    main(args)
