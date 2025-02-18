@@ -1,6 +1,7 @@
 import sys
 import csv
 
+
 def parse_log_with_header(log_filename):
     """
     Author : Massey_gh
@@ -25,13 +26,14 @@ def parse_log_with_header(log_filename):
 
     i = 0
     while i < len(lines):
-        if i + 4 < len(lines) and lines[i+1].startswith("Q1") and lines[i+3].startswith("Q2"):
-            block = lines[i:i+5]
+        if i + 4 < len(lines) and lines[i + 1].startswith("Q1") and lines[i + 3].startswith("Q2"):
+            block = lines[i:i + 5]
             blocks.append(block)
             i += 5
         else:
             i += 1
     return header, blocks
+
 
 def convert_block_to_csv_row(block):
     """
@@ -51,6 +53,7 @@ def convert_block_to_csv_row(block):
     final_row = f"{base_row},{q1_response},{q2_response}"
     return final_row
 
+
 def process_log_to_csv(log_filename, output_csv):
     header, blocks = parse_log_with_header(log_filename)
     rows = [convert_block_to_csv_row(block) for block in blocks]
@@ -60,9 +63,11 @@ def process_log_to_csv(log_filename, output_csv):
         if header:
             writer.writerow(header.split(','))
         else:
-            writer.writerow(["img_path", "query", "answer", "new query", "new answer", "type", "response", "new_response"])
+            writer.writerow(
+                ["img_path", "query", "answer", "new query", "new answer", "type", "response", "new_response"])
         for row in rows:
             writer.writerow(row.split(','))
+
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:
