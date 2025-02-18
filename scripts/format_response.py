@@ -4,15 +4,11 @@ import os
 
 # raw response files
 input_files = [
-    'llava_v15_7b_formatting_responses.csv',
-    'llava_v15_13b_formatting_responses.csv',
-    'qwen_responses.csv'
+    'output.csv',
     ]
 # formatted response files
 output_files = [
-    'llava_v15_7b_formatting_results.csv',
-    'llava_v15_13b_formatting_results.csv',
-    'qwen_results.csv'
+    'llava_v15_13b_Real_formatting_results.csv',
     ]
 
 def get_numbers(numbers):

@@ -2,24 +2,7 @@ import csv
 
 # formatted response files
 files = [
-    'C-VQA_vipergpt_results.csv', 
-    'C-VQA_visprog_results.csv',
-    'C-VQA_instructblip-flant5xxl_results.csv', 
-    'C-VQA_instructblip-vicuna7b_results.csv', 
-    'C-VQA_instructblip-vicuna13b_results.csv', 
-    'C_VQA_LLaVA-7B-v0_results.csv',
-    'C_VQA_LLaVA-13B-v0_results.csv', 
-    'C-VQA_blip2_flant5_results.csv', 
-    'C-VQA_minigpt4_7B_results.csv',
-    'C-VQA_LLaVa-v1.5-7b_results.csv',
-    'C-VQA_LLaVa-v1.5-13b_results.csv',
-    'C-VQA_minigpt4v_results.csv',
-    'C-VQA_vipergpt_CodeLlama-34b-Instruct_results.csv',
-    'C-VQA_vipergpt_CodeLlama-13b-Instruct_results.csv',
-    'C-VQA_vipergpt_CodeLlama-7b-Instruct_results.csv',
-    'C-VQA_vipergpt_WizardCoder-15B_results.csv',
-    'C-VQA_vipergpt_WizardCoder-Python-13B-V1.0_results.csv',
-    'C-VQA_vipergpt_WizardCoder-Python-7B_results.csv',
+    "llava_v15_13b_Real_formatting_results.csv"
     ]
 
 for file in files:
