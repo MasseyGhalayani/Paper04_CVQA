@@ -53,6 +53,7 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+
 def load_image(image_file):
     if image_file.startswith('http://') or image_file.startswith('https://'):
         response = requests.get(image_file)
@@ -60,6 +61,7 @@ def load_image(image_file):
     else:
         image = Image.open(image_file).convert('RGB')
     return image
+
 
 def load_query_file(query_file):
     df = pd.read_csv(query_file)
@@ -70,20 +72,22 @@ def load_query_file(query_file):
     new_answers = df['new answer'].tolist()
     typies = df['type'].tolist()
     assert len(img_paths) == len(queries) == len(new_queries)
-    return img_paths, queries, new_queries,answers,new_answers,typies
+    return img_paths, queries, new_queries, answers, new_answers, typies
+
 
 def make_prompt(prompt):
     return prompt + " Answer the question using a single word or phrase."
-def main(args):
 
+
+def main(args):
     img_paths, queries, new_queries, answers, new_answers, typies = load_query_file(args.query)
 
     disable_torch_init()
 
     model_name = get_model_name_from_path(args.model_path)
-    tokenizer, model, image_processor, context_len = load_pretrained_model(
-        args.model_path, args.model_base, model_name, args.load_8bit, args.load_4bit, device=args.device
-    )
+    tokenizer, model, image_processor, context_len = load_pretrained_model(args.model_path, args.model_base, model_name,
+                                                                           args.load_8bit, args.load_4bit,
+                                                                           device=args.device)
 
     if 'llama-2' in model_name.lower():
         conv_mode = "llava_llama_2"
@@ -95,111 +99,116 @@ def main(args):
         conv_mode = "llava_v0"
 
     if args.conv_mode is not None and conv_mode != args.conv_mode:
-        print('[WARNING] the auto inferred conversation mode is {}, while `--conv-mode` is {}, using {}'.format(conv_mode, args.conv_mode, args.conv_mode))
+        print(
+            '[WARNING] the auto inferred conversation mode is {}, while `--conv-mode` is {}, using {}'.format(conv_mode,
+                                                                                                              args.conv_mode,
+                                                                                                              args.conv_mode))
     else:
         args.conv_mode = conv_mode
 
-    # Initialize conversation template based on model type.
     conv = conv_templates[args.conv_mode].copy()
     if "mpt" in model_name.lower():
         roles = ('user', 'assistant')
     else:
         roles = conv.roles
 
-    # ===== Changed: Instead of writing rows immediately to CSV, we accumulate results in a list =====
-    results = []
+    with open('{}_responses.csv'.format(args.type), 'w', encoding='utf-8') as res_f:
 
-    for (img_path, query, new_query, answer, new_answer, query_type) in tzip(img_paths, queries, new_queries, answers, new_answers, typies):
+        fieldnames_res = ['img_path', 'query', 'answer', 'new query', 'new answer', 'type', 'response', 'new_response']
 
-        image = load_image(os.path.join("../Paper04_CVQA/C-VQA/C-VQA-Synthetic/C-VQA-Synthetic_images", img_path))
-        image_tensor = process_images([image], image_processor, model.config)
-        if isinstance(image_tensor, list):
-            image_tensor = [img.to(model.device, dtype=torch.float16) for img in image_tensor]
-        else:
-            image_tensor = image_tensor.to(model.device, dtype=torch.float16)
+        writer_res = csv.DictWriter(sys.stdout, fieldnames=fieldnames_res)
+        writer_res.writeheader()
 
-        # Process the first query
-        inp = make_prompt(query)
-        conv = conv_templates[args.conv_mode].copy()
-        if model.config.mm_use_im_start_end:
-            inp = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + inp
-        else:
-            inp = DEFAULT_IMAGE_TOKEN + '\n' + inp
-        conv.append_message(conv.roles[0], inp)
-        conv.append_message(conv.roles[1], None)
+        for (img_path, query, new_query, answer, new_answer, query_type) in tzip(img_paths, queries, new_queries,
+                                                                                 answers, new_answers, typies):
 
-        prompt = conv.get_prompt()
-        input_ids = tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(model.device)
-        stop_str = conv.sep if conv.sep_style != SeparatorStyle.TWO else conv.sep2
-        keywords = [stop_str]
-        stopping_criteria = KeywordsStoppingCriteria(keywords, tokenizer, input_ids)
-        streamer = TextStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
+            image = load_image(os.path.join("../Paper04_CVQA/C-VQA/C-VQA-Real/C-VQA-Real_images", img_path))
+            image_tensor = process_images([image], image_processor, model.config)
+            if type(image_tensor) is list:
+                image_tensor = [image.to(model.device, dtype=torch.float16) for image in image_tensor]
+            else:
+                image_tensor = image_tensor.to(model.device, dtype=torch.float16)
 
-        with torch.inference_mode():
-            output_ids = model.generate(
-                input_ids,
-                images=image_tensor,
-                do_sample=True if args.temperature > 0 else False,
-                temperature=args.temperature,
-                max_new_tokens=args.max_new_tokens,
-                streamer=streamer,
-                use_cache=True,
-                stopping_criteria=[stopping_criteria]
-            )
+            inp = make_prompt(query)
+            conv = conv_templates[args.conv_mode].copy()
+            if model.config.mm_use_im_start_end:
+                inp = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + inp
+            else:
+                inp = DEFAULT_IMAGE_TOKEN + '\n' + inp
+            conv.append_message(conv.roles[0], inp)
+            conv.append_message(conv.roles[1], None)
 
-        result = tokenizer.decode(output_ids[0, input_ids.shape[1]:]).strip()
-        print(inp, ":", result)
+            prompt = conv.get_prompt()
+            input_ids = tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(
+                0).to(model.device)
+            stop_str = conv.sep if conv.sep_style != SeparatorStyle.TWO else conv.sep2
+            keywords = [stop_str]
+            stopping_criteria = KeywordsStoppingCriteria(keywords, tokenizer, input_ids)
+            streamer = TextStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
 
-        # Process the new query
-        inp = make_prompt(new_query)
-        conv = conv_templates[args.conv_mode].copy()
-        if model.config.mm_use_im_start_end:
-            inp = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + inp
-        else:
-            inp = DEFAULT_IMAGE_TOKEN + '\n' + inp
-        conv.append_message(conv.roles[0], inp)
-        conv.append_message(conv.roles[1], None)
+            with torch.inference_mode():
+                output_ids = model.generate(
+                    input_ids,
+                    images=image_tensor,
+                    do_sample=True if args.temperature > 0 else False,
+                    temperature=args.temperature,
+                    max_new_tokens=args.max_new_tokens,
+                    streamer=streamer,
+                    use_cache=True,
+                    stopping_criteria=[stopping_criteria])
 
-        prompt = conv.get_prompt()
-        input_ids = tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(model.device)
-        stop_str = conv.sep if conv.sep_style != SeparatorStyle.TWO else conv.sep2
-        keywords = [stop_str]
-        stopping_criteria = KeywordsStoppingCriteria(keywords, tokenizer, input_ids)
-        streamer = TextStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
+            result = tokenizer.decode(output_ids[0, input_ids.shape[1]:]).strip()
+            print("Q1", "==>", result, flush=True)
 
-        with torch.inference_mode():
-            output_ids = model.generate(
-                input_ids,
-                images=image_tensor,
-                do_sample=True if args.temperature > 0 else False,
-                temperature=args.temperature,
-                max_new_tokens=args.max_new_tokens,
-                streamer=streamer,
-                use_cache=True,
-                stopping_criteria=[stopping_criteria]
-            )
+            inp = make_prompt(new_query)
+            conv = conv_templates[args.conv_mode].copy()
+            if model.config.mm_use_im_start_end:
+                inp = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + inp
+            else:
+                inp = DEFAULT_IMAGE_TOKEN + '\n' + inp
+            conv.append_message(conv.roles[0], inp)
+            conv.append_message(conv.roles[1], None)
 
-        new_result = tokenizer.decode(output_ids[0, input_ids.shape[1]:]).strip()
-        print(inp, ":", new_result)
+            prompt = conv.get_prompt()
+            input_ids = tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(
+                0).to(model.device)
+            stop_str = conv.sep if conv.sep_style != SeparatorStyle.TWO else conv.sep2
+            keywords = [stop_str]
+            stopping_criteria = KeywordsStoppingCriteria(keywords, tokenizer, input_ids)
+            streamer = TextStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
 
-        # ===== Changed: Instead of writer_res.writerow, we append to our results list =====
-        results.append({
-            'img_path': img_path,
-            'query': query,
-            'answer': answer,
-            'new query': new_query,
-            'new answer': new_answer,
-            'type': query_type,
-            'response': result,
-            'new_response': new_result
-        })
+            with torch.inference_mode():
+                output_ids = model.generate(
+                    input_ids,
+                    images=image_tensor,
+                    do_sample=True if args.temperature > 0 else False,
+                    temperature=args.temperature,
+                    max_new_tokens=args.max_new_tokens,
+                    streamer=streamer,
+                    use_cache=True,
+                    stopping_criteria=[stopping_criteria])
 
-    # ===== Changed: Write all results at once using pandas =====
-    df = pd.DataFrame(results)
-    df.to_csv(f"{args.type}_responses.csv", index=False, encoding='utf-8')
+            new_result = tokenizer.decode(output_ids[0, input_ids.shape[1]:]).strip()
+            new_result = new_result + " "
 
+            print("Q2", "==>", new_result, flush=True)
+
+            writer_res.writerow({
+                'img_path': img_path,
+                'query': query,
+                'answer': answer,
+                'new query': new_query,
+                'new answer': new_answer,
+                'type': query_type,
+                'response': result,
+                'new_response': new_result})
+
+            res_f.flush()
+            sys.stdout.flush()
 
 
 if __name__ == "__main__":
     args = parse_args()
     main(args)
+
+
